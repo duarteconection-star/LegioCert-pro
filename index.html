@@ -3,42 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="LegioCert Pro – Gestión profesional de tratamientos antilegionella y certificación conforme a RD 487/2022 y RD 614/2024">
+  <meta name="description" content="LegioCert Pro – Gestión profesional de tratamientos antilegionella">
   <meta name="theme-color" content="#0A2342">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="LegioCert">
   <meta name="mobile-web-app-capable" content="yes">
-
   <title>LegioCert Pro</title>
-
-  <!-- PWA Manifest -->
   <link rel="manifest" href="./manifest.json">
-
-  <!-- Apple Touch Icons -->
   <link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
-  <link rel="icon" type="image/png" sizes="32x32"  href="./assets/icons/icon-96.png">
-
-  <!-- Google Fonts (carga diferida) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-
-  <!-- Estilos -->
   <link rel="stylesheet" href="./style.css">
-
   <style>
-    /* Inter como fuente principal */
-    body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
-
-    /* Splash screen inicial */
     #splash {
       position: fixed; inset: 0; z-index: 9999;
       background: #0A2342;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 20px;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.4s ease;
     }
     #splash.fade-out { opacity: 0; pointer-events: none; }
     .splash-logo {
@@ -47,30 +29,21 @@
       border-radius: 24px;
       display: flex; align-items: center; justify-content: center;
       font-weight: 900; font-size: 28px; color: white;
-      box-shadow: 0 8px 32px rgba(0,188,212,0.4);
-      animation: pulse 1.5s ease-in-out infinite;
     }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 8px 32px rgba(0,188,212,0.4); }
-      50%       { box-shadow: 0 8px 48px rgba(0,188,212,0.7); }
-    }
-    .splash-title { font-size: 28px; font-weight: 900; color: white; letter-spacing: -0.5px; }
+    .splash-title { font-size: 28px; font-weight: 900; color: white; }
     .splash-title span { color: #00BCD4; }
     .splash-sub { font-size: 13px; color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase; }
     .splash-spinner {
-      width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.1);
-      border-top-color: #00BCD4; border-radius: 50%;
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #00BCD4;
+      border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .splash-version { font-size: 11px; color: rgba(255,255,255,0.25); position: absolute; bottom: 24px; }
-
-    /* Icono SVG generado inline para PWA (fallback si no hay archivo) */
   </style>
 </head>
 <body>
-
-  <!-- SPLASH SCREEN -->
   <div id="splash">
     <div class="splash-logo">LC</div>
     <div>
@@ -78,13 +51,10 @@
       <div class="splash-sub">Duarte Conection</div>
     </div>
     <div class="splash-spinner"></div>
-    <div class="splash-version">v1.0.0 · RD 487/2022 · RD 614/2024</div>
   </div>
 
-  <!-- APP (se construye por JS) -->
   <div id="root"></div>
 
-  <!-- ═══════════════════ SCRIPTS (orden de carga importa) ═══════════════════ -->
   <script src="./config.js"></script>
   <script src="./db.js"></script>
   <script src="./gps.js"></script>
@@ -102,70 +72,14 @@
   <script src="./app.js"></script>
 
   <script>
-    // Ocultar splash cuando la app esté lista
     document.addEventListener('DOMContentLoaded', () => {
-      // Splash mínimo de 1.2s para evitar parpadeo
       setTimeout(() => {
         const splash = document.getElementById('splash');
         if (splash) {
           splash.classList.add('fade-out');
-          setTimeout(() => splash.remove(), 500);
+          setTimeout(() => splash.remove(), 400);
         }
       }, 1200);
-    });
-
-    // Generar iconos PNG en canvas como fallback si no existen los archivos
-    const generarIconoPWA = () => {
-      const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
-      sizes.forEach(size => {
-        const canvas = document.createElement('canvas');
-        canvas.width = size; canvas.height = size;
-        const ctx = canvas.getContext('2d');
-
-        // Fondo gradiente
-        const grad = ctx.createLinearGradient(0, 0, size, size);
-        grad.addColorStop(0, '#00BCD4');
-        grad.addColorStop(1, '#1565C0');
-        ctx.fillStyle = grad;
-        roundRect(ctx, 0, 0, size, size, size * 0.2);
-        ctx.fill();
-
-        // Texto LC
-        ctx.fillStyle = 'white';
-        ctx.font = `900 ${size * 0.35}px Inter, Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('LC', size / 2, size / 2);
-
-        canvas.toBlob(blob => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          // Actualizar links del head
-          const link = document.querySelector(`link[sizes="${size}x${size}"]`);
-          if (link) link.href = url;
-        }, 'image/png');
-      });
-    };
-
-    const roundRect = (ctx, x, y, w, h, r) => {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    };
-
-    // Intentar generar iconos canvas si los PNG no cargan
-    window.addEventListener('load', () => {
-      const testImg = new Image();
-      testImg.onerror = () => generarIconoPWA();
-      testImg.src = './assets/icons/icon-192.png';
     });
   </script>
 </body>
