@@ -1,15 +1,6 @@
 <!DOCTYPE html>
 <html lang="es" data-theme="dark">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  /* Soluciona la borrosidad en pantallas de móvil */
-  canvas, img {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    -webkit-font-smoothing: antialiased;
-  }
-</style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="LegioCert Pro – Gestión profesional de tratamientos antilegionella">
@@ -19,11 +10,26 @@
   <meta name="apple-mobile-web-app-title" content="LegioCert">
   <meta name="mobile-web-app-capable" content="yes">
   <title>LegioCert Pro</title>
+  
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./assets/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
   <link rel="stylesheet" href="./style.css">
+
   <style>
+    /* Ajustes anti-borrosidad para pantallas móviles OLED/Retina */
+    *, *::before, *::after {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    canvas, img {
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+
+    /* Estilos Pantalla de Carga */
     #splash {
       position: fixed; inset: 0; z-index: 9999;
       background: #0A2342;
@@ -64,6 +70,7 @@
 
   <div id="root"></div>
 
+  <!-- Scripts principales -->
   <script src="./config.js"></script>
   <script src="./db.js"></script>
   <script src="./gps.js"></script>
@@ -81,15 +88,42 @@
   <script src="./app.js"></script>
 
   <script>
+    // Corrección automática de borrosidad para canvas en móviles (firmas y dibujos)
+    function fixCanvasBlur() {
+      const dpr = window.devicePixelRatio || 1;
+      document.querySelectorAll('canvas').forEach(canvas => {
+        if (!canvas.dataset.scaled) {
+          const rect = canvas.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.scale(dpr, dpr);
+            canvas.dataset.scaled = "true";
+          }
+        }
+      });
+    }
+
+    // Ocultar pantalla de carga (Splash) con seguro antichoque
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
+      const removeSplash = () => {
         const splash = document.getElementById('splash');
-        if (splash) {
+        if (splash && !splash.classList.contains('fade-out')) {
           splash.classList.add('fade-out');
           setTimeout(() => splash.remove(), 400);
+          fixCanvasBlur();
         }
-      }, 1200);
+      };
+
+      // Intentar ocultar a los 1.2 segundos
+      setTimeout(removeSplash, 1200);
+
+      // Desbloqueo de seguridad a los 3 segundos si falla la carga de algún script
+      setTimeout(removeSplash, 3000);
     });
+
+    window.addEventListener('resize', fixCanvasBlur);
   </script>
 </body>
 </html>
