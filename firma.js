@@ -1,12 +1,11 @@
 /**
- * LegioCert Pro - Módulo de Firmas Digitales
- * Canvas de firma para técnico y cliente
+ * LegioCert Pro - Módulo de Firmas Digitales v2
+ * Bug fix: inicialización correcta del canvas tras renderizado del DOM
  */
 
 const FirmaModule = (() => {
   const instancias = {};
 
-  // Crear pad de firma en un contenedor
   const crear = (containerId, label = 'Firma') => {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -19,43 +18,54 @@ const FirmaModule = (() => {
             <button class="btn btn-sm btn-ghost" onclick="FirmaModule.limpiar('${containerId}')">Limpiar</button>
           </div>
         </div>
-        <canvas id="${containerId}_canvas" class="firma-canvas" width="400" height="150"></canvas>
-        <p class="firma-hint">Firma con el dedo o el ratón</p>
+        <canvas id="${containerId}_canvas" class="firma-canvas" width="600" height="200"></canvas>
+        <p class="firma-hint">Firma con el dedo o el ratón en el recuadro blanco</p>
       </div>
     `;
 
-    const canvas = document.getElementById(`${containerId}_canvas`);
-    inicializarCanvas(containerId, canvas);
+    // Esperar al siguiente frame para que el DOM esté pintado
+    requestAnimationFrame(() => {
+      setTimeout(() => inicializarCanvas(containerId), 100);
+    });
   };
 
-  const inicializarCanvas = (id, canvas) => {
+  const inicializarCanvas = (id) => {
+    const canvas = document.getElementById(`${id}_canvas`);
+    if (!canvas) return;
+
+    // Ajustar tamaño real del canvas al tamaño CSS
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width > 0) {
+      canvas.width = rect.width;
+      canvas.height = Math.max(160, rect.height);
+    }
+
     const ctx = canvas.getContext('2d');
     let dibujando = false;
-    let lastX = 0, lastY = 0;
-
-    // Configurar estilo de trazo
-    ctx.strokeStyle = '#0A2342';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
 
     // Fondo blanco
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Estilo de trazo
+    ctx.strokeStyle = '#0A2342';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
     const getPos = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      if (e.touches) {
+      const r = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / r.width;
+      const scaleY = canvas.height / r.height;
+      if (e.touches && e.touches[0]) {
         return {
-          x: (e.touches[0].clientX - rect.left) * scaleX,
-          y: (e.touches[0].clientY - rect.top) * scaleY,
+          x: (e.touches[0].clientX - r.left) * scaleX,
+          y: (e.touches[0].clientY - r.top) * scaleY,
         };
       }
       return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY,
+        x: (e.clientX - r.left) * scaleX,
+        y: (e.clientY - r.top) * scaleY,
       };
     };
 
@@ -63,9 +73,8 @@ const FirmaModule = (() => {
       e.preventDefault();
       dibujando = true;
       const pos = getPos(e);
-      lastX = pos.x; lastY = pos.y;
       ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
+      ctx.moveTo(pos.x, pos.y);
     };
 
     const draw = (e) => {
@@ -74,60 +83,94 @@ const FirmaModule = (() => {
       const pos = getPos(e);
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
-      lastX = pos.x; lastY = pos.y;
     };
 
-    const stopDraw = () => { dibujando = false; };
+    const stopDraw = (e) => {
+      if (e) e.preventDefault();
+      dibujando = false;
+    };
 
-    // Mouse
-    canvas.addEventListener('mousedown', startDraw);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDraw);
-    canvas.addEventListener('mouseleave', stopDraw);
+    // Eliminar listeners anteriores clonando el canvas
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    const c = newCanvas;
+    const ctx2 = c.getContext('2d');
+    ctx2.fillStyle = '#FFFFFF';
+    ctx2.fillRect(0, 0, c.width, c.height);
+    ctx2.strokeStyle = '#0A2342';
+    ctx2.lineWidth = 2.5;
+    ctx2.lineCap = 'round';
+    ctx2.lineJoin = 'round';
 
-    // Touch
-    canvas.addEventListener('touchstart', startDraw, { passive: false });
-    canvas.addEventListener('touchmove', draw, { passive: false });
-    canvas.addEventListener('touchend', stopDraw);
+    let drawing = false;
 
-    instancias[id] = { canvas, ctx };
+    const getPos2 = (e) => {
+      const r = c.getBoundingClientRect();
+      const sx = c.width / r.width;
+      const sy = c.height / r.height;
+      if (e.touches && e.touches[0]) {
+        return { x: (e.touches[0].clientX - r.left) * sx, y: (e.touches[0].clientY - r.top) * sy };
+      }
+      return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
+    };
+
+    c.addEventListener('mousedown', (e) => {
+      drawing = true;
+      const p = getPos2(e);
+      ctx2.beginPath(); ctx2.moveTo(p.x, p.y);
+    });
+    c.addEventListener('mousemove', (e) => {
+      if (!drawing) return;
+      const p = getPos2(e);
+      ctx2.lineTo(p.x, p.y); ctx2.stroke();
+    });
+    c.addEventListener('mouseup', () => { drawing = false; });
+    c.addEventListener('mouseleave', () => { drawing = false; });
+    c.addEventListener('touchstart', (e) => {
+      e.preventDefault(); drawing = true;
+      const p = getPos2(e); ctx2.beginPath(); ctx2.moveTo(p.x, p.y);
+    }, { passive: false });
+    c.addEventListener('touchmove', (e) => {
+      e.preventDefault(); if (!drawing) return;
+      const p = getPos2(e); ctx2.lineTo(p.x, p.y); ctx2.stroke();
+    }, { passive: false });
+    c.addEventListener('touchend', (e) => { e.preventDefault(); drawing = false; }, { passive: false });
+
+    instancias[id] = { canvas: c, ctx: ctx2 };
   };
 
   const limpiar = (id) => {
     const inst = instancias[id];
-    if (!inst) return;
-    const { ctx, canvas } = inst;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!inst) { inicializarCanvas(id); return; }
+    inst.ctx.fillStyle = '#FFFFFF';
+    inst.ctx.fillRect(0, 0, inst.canvas.width, inst.canvas.height);
   };
 
-  // Obtener imagen de firma como base64
   const obtenerImagen = (id) => {
     const inst = instancias[id];
     if (!inst) return null;
     return inst.canvas.toDataURL('image/png');
   };
 
-  // Verificar si hay firma (no está en blanco)
   const tieneFirma = (id) => {
     const inst = instancias[id];
     if (!inst) return false;
-    const { ctx, canvas } = inst;
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
+    const data = inst.ctx.getImageData(0, 0, inst.canvas.width, inst.canvas.height).data;
     for (let i = 0; i < data.length; i += 4) {
       if (data[i] < 250 || data[i+1] < 250 || data[i+2] < 250) return true;
     }
     return false;
   };
 
-  // Cargar firma desde base64
   const cargarImagen = (id, base64) => {
-    const inst = instancias[id];
-    if (!inst || !base64) return;
-    const img = new Image();
-    img.onload = () => inst.ctx.drawImage(img, 0, 0);
-    img.src = base64;
+    if (!base64) return;
+    setTimeout(() => {
+      const inst = instancias[id];
+      if (!inst) return;
+      const img = new Image();
+      img.onload = () => inst.ctx.drawImage(img, 0, 0, inst.canvas.width, inst.canvas.height);
+      img.src = base64;
+    }, 200);
   };
 
   return { crear, limpiar, obtenerImagen, tieneFirma, cargarImagen };
