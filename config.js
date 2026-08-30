@@ -1,112 +1,164 @@
 /**
- * LegioCert Pro - Configuración Global
- * Parámetros, constantes y configuración de la aplicación
+ * LegioCert Pro - Módulo de Configuración actualizado
+ * Añadido campo Nº Registro Sanitario empresa aplicadora
  */
 
-const CONFIG = {
-  APP_NAME: 'LegioCert Pro',
-  APP_VERSION: '1.0.0',
-  APP_AUTHOR: 'Duarte Conection',
-  APP_EMAIL: 'duarteconection@gmail.com',
+const ConfigModule = (() => {
+  const render = () => `
+    <div class="module-header">
+      <h2><i class="icon">⚙️</i> Configuración</h2>
+    </div>
+    <div class="config-sections">
+      <div class="config-section">
+        <h3>🏢 Empresa aplicadora</h3>
+        <p class="text-muted" style="margin-bottom:14px;font-size:13px">Estos datos aparecerán en todos los certificados.</p>
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label>Nombre de la empresa *</label>
+            <input type="text" id="cfg_empresa" placeholder="Duarte Conection">
+          </div>
+          <div class="form-group">
+            <label>CIF *</label>
+            <input type="text" id="cfg_cif" placeholder="B12345678">
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" id="cfg_telefono" placeholder="600 000 000">
+          </div>
+          <div class="form-group form-full">
+            <label>Email</label>
+            <input type="email" id="cfg_email" placeholder="empresa@email.com">
+          </div>
+          <div class="form-group form-full">
+            <label>Dirección</label>
+            <input type="text" id="cfg_direccion" placeholder="Calle, número, ciudad, CP">
+          </div>
+          <div class="form-group form-full">
+            <label>Nº Registro Sanitario / Empresa habilitada (opcional)</label>
+            <input type="text" id="cfg_registro" placeholder="Ej: AND-CA-0001 o número de autorización">
+          </div>
+          <div class="form-group form-full">
+            <label>Nombre del técnico por defecto</label>
+            <input type="text" id="cfg_tecnico" placeholder="Nombre del técnico responsable">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="ConfigModule.guardarEmpresa()">💾 Guardar datos de empresa</button>
+      </div>
 
-  // Normativa aplicable
-  NORMATIVA: {
-    RD_487: 'Real Decreto 487/2022',
-    RD_614: 'Real Decreto 614/2024',
-    UNE: 'UNE 100030:2017+A1:2018',
-  },
+      <div class="config-section">
+        <h3>💶 Tarifas por defecto</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Precio hora de trabajo (€)</label>
+            <input type="number" id="cfg_precioHora" placeholder="35" step="0.5">
+          </div>
+          <div class="form-group">
+            <label>Precio por km (€)</label>
+            <input type="number" id="cfg_precioKm" placeholder="0.35" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Margen por defecto (%)</label>
+            <input type="number" id="cfg_margen" placeholder="30" step="1">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="ConfigModule.guardarTarifas()">💾 Guardar tarifas</button>
+      </div>
 
-  // Textos legales automáticos para certificados
-  TEXTOS_LEGALES: {
-    intro: 'El presente certificado acredita la realización del tratamiento de desinfección conforme a lo establecido en el Real Decreto 487/2022, de 21 de junio, por el que se establecen los requisitos técnico-sanitarios para la prevención y control de la legionelosis, modificado por el Real Decreto 614/2024.',
-    metodo: 'El tratamiento se ha realizado según el protocolo establecido en la UNE 100030:2017+A1:2018, Guía para la prevención y control de la proliferación y diseminación de Legionella en instalaciones.',
-    validez: 'Este certificado es válido como documento acreditativo del mantenimiento higiénico-sanitario realizado en la instalación descrita.',
-  },
+      <div class="config-section">
+        <h3>🌙 Apariencia</h3>
+        <div class="form-group">
+          <label>Tema</label>
+          <select id="cfg_tema" onchange="ConfigModule.cambiarTema(this.value)">
+            <option value="dark">Oscuro</option>
+            <option value="light">Claro</option>
+          </select>
+        </div>
+      </div>
 
-  // Protocolos de cloro (ppm)
-  PROTOCOLOS_CLORO: {
-    MANTENIMIENTO: { ppm: 20, descripcion: 'Choque de mantenimiento', tiempoContacto: 2 },
-    DESINFECCION: { ppm: 50, descripcion: 'Desinfección preventiva', tiempoContacto: 6 },
-    CHOQUE: { ppm: 150, descripcion: 'Choque por Legionella positivo', tiempoContacto: 12 },
-  },
+      <div class="config-section">
+        <h3>💾 Copia de seguridad</h3>
+        <p class="text-muted" style="margin-bottom:12px">Exporta o importa todos los datos de la aplicación.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="App.exportarBackup()">📤 Exportar backup</button>
+          <label class="btn btn-ghost">
+            📥 Importar backup
+            <input type="file" accept=".json" onchange="App.importarBackup(this.files[0])" style="display:none">
+          </label>
+        </div>
+      </div>
 
-  // Productos químicos y conversiones
-  PRODUCTOS: {
-    CLORO_GRANULADO: { nombre: 'Cloro granulado (65%)', concentracion: 0.65, unidad: 'kg', densidad: null },
-    HIPOCLORITO_SODICO: { nombre: 'Hipoclorito sódico (12%)', concentracion: 0.12, unidad: 'L', densidad: 1.21 },
-    DIOXIDO_CLORO: { nombre: 'Dióxido de cloro (0.3%)', concentracion: 0.003, unidad: 'L', densidad: 1.0 },
-  },
+      <div class="config-section danger-zone">
+        <h3>⚠️ Zona peligrosa</h3>
+        <p class="text-muted" style="margin-bottom:12px">Esta acción no se puede deshacer.</p>
+        <button class="btn btn-danger" onclick="ConfigModule.borrarTodo()">🗑️ Borrar todos los datos</button>
+      </div>
 
-  // Conversiones de volumen
-  CONVERSIONES: {
-    L_A_M3: 0.001,
-    M3_A_L: 1000,
-    L_A_GAL: 0.264172,
-    GAL_A_L: 3.78541,
-    M3_A_GAL: 264.172,
-    GAL_A_M3: 0.00378541,
-  },
+      <div class="config-section">
+        <h3>ℹ️ Acerca de</h3>
+        <p><strong>LegioCert Pro</strong> v${CONFIG.APP_VERSION}</p>
+        <p class="text-muted">${CONFIG.APP_AUTHOR} · ${CONFIG.APP_EMAIL}</p>
+        <p class="text-muted" style="margin-top:6px">Normativa: ${CONFIG.NORMATIVA.RD_487} · ${CONFIG.NORMATIVA.RD_614} · ${CONFIG.NORMATIVA.UNE}</p>
+      </div>
+    </div>
+  `;
 
-  // Tipos de instalación
-  TIPOS_INSTALACION: [
-    'ACS (Agua Caliente Sanitaria)',
-    'AFCH (Agua Fría de Consumo Humano)',
-    'Depósito de agua',
-    'Piscina',
-    'SPA / Jacuzzi',
-    'Torre de refrigeración',
-    'Humectador',
-    'Fuente ornamental',
-    'Sistema de riego',
-    'Otro',
-  ],
+  const load = async () => {
+    const campos = ['empresa','cif','telefono','email','direccion','registro','tecnico','precioHora','precioKm','margen','tema'];
+    for (const campo of campos) {
+      const val = await DB.getConfig(`cfg_${campo}`);
+      const el = document.getElementById(`cfg_${campo}`);
+      if (el && val !== null) el.value = val;
+    }
+    const tema = await DB.getConfig('cfg_tema') || 'dark';
+    document.documentElement.setAttribute('data-theme', tema);
+    const select = document.getElementById('cfg_tema');
+    if (select) select.value = tema;
+  };
 
-  // Materiales de instalación
-  MATERIALES: ['Cobre', 'Acero inoxidable', 'PVC', 'Polietileno', 'Fibra de vidrio', 'Hierro galvanizado', 'Otro'],
+  const guardarEmpresa = async () => {
+    const campos = ['empresa','cif','telefono','email','direccion','registro','tecnico'];
+    for (const c of campos) {
+      const val = document.getElementById(`cfg_${c}`)?.value || '';
+      await DB.setConfig(`cfg_${c}`, val);
+      if (c === 'empresa') CONFIG.PDF.EMPRESA = val;
+      if (c === 'email') CONFIG.PDF.EMAIL_EMPRESA = val;
+      if (c === 'telefono') CONFIG.PDF.TELEFONO_EMPRESA = val;
+      if (c === 'tecnico') await DB.setConfig('tecnico_nombre', val);
+    }
+    App.toast('Datos de empresa guardados', 'success');
+  };
 
-  // Provincias de España
-  PROVINCIAS: [
-    'Álava','Albacete','Alicante','Almería','Asturias','Ávila','Badajoz','Barcelona','Burgos','Cáceres',
-    'Cádiz','Cantabria','Castellón','Ciudad Real','Córdoba','Cuenca','Girona','Granada','Guadalajara',
-    'Guipúzcoa','Huelva','Huesca','Islas Baleares','Jaén','La Coruña','La Rioja','Las Palmas','León',
-    'Lleida','Lugo','Madrid','Málaga','Murcia','Navarra','Ourense','Palencia','Pontevedra','Salamanca',
-    'Santa Cruz de Tenerife','Segovia','Sevilla','Soria','Tarragona','Teruel','Toledo','Valencia',
-    'Valladolid','Vizcaya','Zamora','Zaragoza','Ceuta','Melilla',
-  ],
+  const guardarTarifas = async () => {
+    const ph = parseFloat(document.getElementById('cfg_precioHora')?.value) || CONFIG.COSTES.MANO_OBRA_HORA;
+    const km = parseFloat(document.getElementById('cfg_precioKm')?.value) || CONFIG.COSTES.DESPLAZAMIENTO_KM;
+    const mg = parseFloat(document.getElementById('cfg_margen')?.value) || CONFIG.COSTES.MARGEN_DEFECTO;
+    await DB.setConfig('cfg_precioHora', ph);
+    await DB.setConfig('cfg_precioKm', km);
+    await DB.setConfig('cfg_margen', mg);
+    CONFIG.COSTES.MANO_OBRA_HORA = ph;
+    CONFIG.COSTES.DESPLAZAMIENTO_KM = km;
+    CONFIG.COSTES.MARGEN_DEFECTO = mg;
+    App.toast('Tarifas guardadas', 'success');
+  };
 
-  // Colores del tema
-  COLORES: {
-    PRIMARY: '#0A2342',
-    PRIMARY_LIGHT: '#1565C0',
-    ACCENT: '#00BCD4',
-    ACCENT_DARK: '#0097A7',
-    SUCCESS: '#26C281',
-    WARNING: '#F39C12',
-    DANGER: '#E74C3C',
-    TEXT: '#1A1A2E',
-    TEXT_LIGHT: '#6B7280',
-    BG: '#F0F4F8',
-    BG_DARK: '#0D1B2A',
-    WHITE: '#FFFFFF',
-  },
+  const cambiarTema = async (tema) => {
+    document.documentElement.setAttribute('data-theme', tema);
+    await DB.setConfig('cfg_tema', tema);
+  };
 
-  // Configuración de PDF
-  PDF: {
-    EMPRESA: 'Duarte Conection',
-    CIF_EMPRESA: '',
-    TELEFONO_EMPRESA: '',
-    EMAIL_EMPRESA: 'duarteconection@gmail.com',
-    DIRECCION_EMPRESA: '',
-    LOGO_URL: null,
-  },
+  const borrarTodo = () => {
+    App.confirm('¿Borrar TODOS los datos? Esta acción es IRREVERSIBLE.', async () => {
+      const stores = ['clientes','instalaciones','tratamientos','certificados','productos','agenda','fotos'];
+      for (const s of stores) {
+        const items = await DB.getAll(s);
+        for (const item of items) await DB.remove(s, item.id);
+      }
+      App.toast('Todos los datos han sido eliminados', 'info');
+      App.navigate('dashboard');
+    });
+  };
 
-  // Costes por defecto
-  COSTES: {
-    MANO_OBRA_HORA: 35,
-    DESPLAZAMIENTO_KM: 0.35,
-    MARGEN_DEFECTO: 30,
-  },
-};
+  return { render, load, guardarEmpresa, guardarTarifas, cambiarTema, borrarTodo };
+})();
 
-// Exportar para uso global
-window.CONFIG = CONFIG;
+window.ConfigModule = ConfigModule;
