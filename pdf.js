@@ -1,58 +1,67 @@
 /**
- * LegioCert Pro - Generador de Certificados PDF v2
- * Añadida empresa aplicadora y campos normativos obligatorios
+ * LegioCert Pro - Generador de Certificados PDF v2 (Corregido y Optimizado para Móvil)
  */
 
 const PDFModule = (() => {
 
   const generarCertificado = async (tratamientoId) => {
-    App.toast('Generando certificado…', 'info');
+    try {
+      App.toast('Generando certificado…', 'info');
 
-    const trat = await DB.getById('tratamientos', tratamientoId);
-    if (!trat) { App.toast('Tratamiento no encontrado', 'error'); return; }
+      const trat = await DB.getById('tratamientos', tratamientoId);
+      if (!trat) { App.toast('Tratamiento no encontrado', 'error'); return; }
 
-    const cliente = trat.clienteId ? await DB.getById('clientes', trat.clienteId) : null;
-    const instalacion = trat.instalacionId ? await DB.getById('instalaciones', trat.instalacionId) : null;
-    const numeroCert = await DB.nextCertNumber();
+      const cliente = trat.clienteId ? await DB.getById('clientes', trat.clienteId) : null;
+      const instalacion = trat.instalacionId ? await DB.getById('instalaciones', trat.instalacionId) : null;
+      const numeroCert = await DB.nextCertNumber();
 
-    // Datos empresa aplicadora desde config
-    const empresaNombre = await DB.getConfig('cfg_empresa') || CONFIG.PDF.EMPRESA;
-    const empresaCif    = await DB.getConfig('cfg_cif') || '';
-    const empresaTel    = await DB.getConfig('cfg_telefono') || '';
-    const empresaEmail  = await DB.getConfig('cfg_email') || CONFIG.PDF.EMAIL_EMPRESA;
-    const empresaDir    = await DB.getConfig('cfg_direccion') || '';
-    const empresaReg    = await DB.getConfig('cfg_registro') || '';
+      // Datos empresa aplicadora desde config
+      const empresaNombre = await DB.getConfig('cfg_empresa') || CONFIG.PDF.EMPRESA;
+      const empresaCif    = await DB.getConfig('cfg_cif') || '';
+      const empresaTel    = await DB.getConfig('cfg_telefono') || '';
+      const empresaEmail  = await DB.getConfig('cfg_email') || CONFIG.PDF.EMAIL_EMPRESA;
+      const empresaDir    = await DB.getConfig('cfg_direccion') || '';
+      const empresaReg    = await DB.getConfig('cfg_registro') || '';
 
-    await DB.add('certificados', {
-      tratamientoId,
-      numero: numeroCert,
-      fecha: new Date().toISOString(),
-      clienteId: trat.clienteId,
-      instalacionId: trat.instalacionId,
-    });
+      await DB.add('certificados', {
+        tratamientoId,
+        numero: numeroCert,
+        fecha: new Date().toISOString(),
+        clienteId: trat.clienteId,
+        instalacionId: trat.instalacionId,
+      });
 
-    const qrBase64 = generarQRSimple(`LegioCert:${numeroCert}|${trat.fecha}|${cliente?.nombre || ''}`);
-    const htmlContent = buildCertHTML(numeroCert, trat, cliente, instalacion, qrBase64, {
-      nombre: empresaNombre, cif: empresaCif, telefono: empresaTel,
-      email: empresaEmail, direccion: empresaDir, registro: empresaReg,
-    });
+      const qrBase64 = generarQRSimple(`LegioCert:${numeroCert}|${trat.fecha || ''}|${cliente?.nombre || ''}`);
+      const htmlContent = buildCertHTML(numeroCert, trat, cliente, instalacion, qrBase64, {
+        nombre: empresaNombre, cif: empresaCif, telefono: empresaTel,
+        email: empresaEmail, direccion: empresaDir, registro: empresaReg,
+      });
 
-    abrirVentanaPDF(htmlContent, numeroCert);
-    App.toast(`Certificado ${numeroCert} generado`, 'success');
-    App.refreshDashboard();
-    App.navigate('historial');
+      abrirVentanaPDF(htmlContent, numeroCert);
+      App.toast(`Certificado ${numeroCert} generado`, 'success');
+      
+      if (typeof App.refreshDashboard === 'function') App.refreshDashboard();
+      if (typeof App.navigate === 'function') App.navigate('historial');
+
+    } catch (error) {
+      console.error('Error al generar el certificado:', error);
+      App.toast('Error al generar el certificado', 'error');
+    }
   };
 
   const buildCertHTML = (numero, trat, cliente, instalacion, qrBase64, empresa) => {
-    const fecha = trat.fecha
-      ? new Date(trat.fecha + 'T12:00:00').toLocaleDateString('es-ES', { day:'2-digit', month:'long', year:'numeric' })
-      : '—';
+    let fecha = '—';
+    if (trat.fecha) {
+      const parts = trat.fecha.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        fecha = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
+      } else {
+        fecha = trat.fecha;
+      }
+    }
 
-    const tipoNorm = {
-      RD487: CONFIG.NORMATIVA.RD_487,
-      RD614: CONFIG.NORMATIVA.RD_614,
-      UNE:   CONFIG.NORMATIVA.UNE,
-    }[trat.normativa] || trat.normativa || CONFIG.NORMATIVA.RD_487;
+    const tipoNorm = (CONFIG.NORMATIVA && CONFIG.NORMATIVA[trat.normativa]) || trat.normativa || CONFIG.NORMATIVA?.RD_487 || 'RD 487/2022';
 
     const tipoTratamiento = {
       mantenimiento: 'Mantenimiento preventivo',
@@ -65,10 +74,9 @@ const PDFModule = (() => {
     const dur = trat.duracionSegundos ? formatDuration(trat.duracionSegundos) : '—';
     const fotosHTML = buildFotosHTML(trat.fotos);
     const firmasHTML = buildFirmasHTML(trat.firmaTecnico, trat.firmaCliente, trat.tecnico);
-    const costes = calcularCostesResumen(trat);
 
     const gpsHTML = trat.gps ? `
-      <tr><td>Latitud / Longitud</td><td>${trat.gps.latitude?.toFixed(6)} / ${trat.gps.longitude?.toFixed(6)}</td></tr>
+      <tr><td>Latitud / Longitud</td><td>${trat.gps.latitude?.toFixed(6) || '—'} / ${trat.gps.longitude?.toFixed(6) || '—'}</td></tr>
       <tr><td>Dirección GPS</td><td>${trat.gps.direccion || '—'}</td></tr>
       <tr><td>Precisión</td><td>±${trat.gps.accuracy?.toFixed(0) || '—'} m</td></tr>
     ` : '';
@@ -195,7 +203,7 @@ const PDFModule = (() => {
   <!-- TÍTULO -->
   <div class="cert-titulo">
     <h1>Certificado de Desinfección y Tratamiento Antilegionella</h1>
-    <div class="normativa">${tipoNorm} · ${CONFIG.NORMATIVA.UNE}</div>
+    <div class="normativa">${tipoNorm} ${CONFIG.NORMATIVA?.UNE ? `· ${CONFIG.NORMATIVA.UNE}` : ''}</div>
   </div>
 
   <!-- EMPRESA APLICADORA -->
@@ -270,7 +278,7 @@ const PDFModule = (() => {
       <tr><td>Hora fin</td><td>${trat.horaFin || '—'}</td></tr>
       <tr><td>Duración</td><td>${dur}</td></tr>
       <tr><td>Tipo de actuación</td><td>${tipoTratamiento}</td></tr>
-      <tr><td>Normativa aplicada</td><td><span class="badge-norm">${tipoNorm}</span></td></tr>
+      <tr><td>Normativa applied</td><td><span class="badge-norm">${tipoNorm}</span></td></tr>
       <tr><td>Producto utilizado</td><td>${trat.producto || '—'}</td></tr>
       <tr><td>Nº Lote</td><td>${trat.lote || '—'}</td></tr>
       <tr><td>Fecha caducidad</td><td>${trat.caducidad || '—'}</td></tr>
@@ -282,37 +290,37 @@ const PDFModule = (() => {
   <div class="cert-section">
     <h2>Parámetros Analíticos</h2>
     <div class="params-grid">
-      ${trat.temperatura !== null && trat.temperatura !== undefined ? `
+      ${trat.temperatura !== null && trat.temperatura !== undefined && trat.temperatura !== '' ? `
         <div class="param-box ${trat.temperatura >= 60 ? 'param-ok' : 'param-alert'}">
           <div class="param-label">Temperatura</div>
           <div class="param-value">${trat.temperatura}</div>
           <div class="param-unit">°C ${trat.temperatura >= 60 ? '✓' : '⚠ <60°C'}</div>
         </div>` : ''}
-      ${trat.phInicial !== null && trat.phInicial !== undefined ? `
+      ${trat.phInicial !== null && trat.phInicial !== undefined && trat.phInicial !== '' ? `
         <div class="param-box">
           <div class="param-label">pH inicial</div>
           <div class="param-value">${trat.phInicial}</div>
           <div class="param-unit">—</div>
         </div>` : ''}
-      ${trat.phFinal !== null && trat.phFinal !== undefined ? `
+      ${trat.phFinal !== null && trat.phFinal !== undefined && trat.phFinal !== '' ? `
         <div class="param-box ${trat.phFinal >= 6.5 && trat.phFinal <= 8.0 ? 'param-ok' : 'param-alert'}">
           <div class="param-label">pH final</div>
           <div class="param-value">${trat.phFinal}</div>
           <div class="param-unit">${trat.phFinal >= 6.5 && trat.phFinal <= 8.0 ? '✓ 6.5–8.0' : '⚠ Fuera rango'}</div>
         </div>` : ''}
-      ${trat.cloroLibreInicial !== null && trat.cloroLibreInicial !== undefined ? `
+      ${trat.cloroLibreInicial !== null && trat.cloroLibreInicial !== undefined && trat.cloroLibreInicial !== '' ? `
         <div class="param-box">
           <div class="param-label">Cl libre inicial</div>
           <div class="param-value">${trat.cloroLibreInicial}</div>
           <div class="param-unit">ppm</div>
         </div>` : ''}
-      ${trat.cloroLibreFinal !== null && trat.cloroLibreFinal !== undefined ? `
+      ${trat.cloroLibreFinal !== null && trat.cloroLibreFinal !== undefined && trat.cloroLibreFinal !== '' ? `
         <div class="param-box ${trat.cloroLibreFinal >= 0.2 ? 'param-ok' : 'param-alert'}">
           <div class="param-label">Cl libre final</div>
           <div class="param-value">${trat.cloroLibreFinal}</div>
           <div class="param-unit">ppm ${trat.cloroLibreFinal >= 0.2 ? '✓' : '⚠ <0.2'}</div>
         </div>` : ''}
-      ${trat.cloroCombinado !== null && trat.cloroCombinado !== undefined ? `
+      ${trat.cloroCombinado !== null && trat.cloroCombinado !== undefined && trat.cloroCombinado !== '' ? `
         <div class="param-box ${trat.cloroCombinado <= 0.5 ? 'param-ok' : 'param-alert'}">
           <div class="param-label">Cl combinado</div>
           <div class="param-value">${trat.cloroCombinado}</div>
@@ -348,9 +356,9 @@ const PDFModule = (() => {
   <div class="cert-section">
     <h2>Declaración Legal</h2>
     <div class="texto-legal">
-      ${CONFIG.TEXTOS_LEGALES.intro}<br><br>
-      ${CONFIG.TEXTOS_LEGALES.metodo}<br><br>
-      ${CONFIG.TEXTOS_LEGALES.validez}
+      ${CONFIG.TEXTOS_LEGALES?.intro || ''}<br><br>
+      ${CONFIG.TEXTOS_LEGALES?.metodo || ''}<br><br>
+      ${CONFIG.TEXTOS_LEGALES?.validez || ''}
     </div>
   </div>
 
@@ -358,7 +366,7 @@ const PDFModule = (() => {
   <div class="cert-footer">
     <div class="legal">
       <strong>${empresa.nombre}</strong> · ${empresa.email}<br>
-      Documento generado electrónicamente por LegioCert Pro v${CONFIG.APP_VERSION}<br>
+      Documento generado electrónicamente por LegioCert Pro v${CONFIG.APP_VERSION || '1.0'}<br>
       Certificado nº <strong>${numero}</strong> · ${new Date().toLocaleString('es-ES')}
     </div>
   </div>
@@ -383,19 +391,23 @@ const PDFModule = (() => {
     const content = grupos.map(g => {
       const imgs = fotos[g.key];
       if (!imgs || imgs.length === 0) return '';
-      return `<div class="fotos-grupo"><h3>${g.label}</h3><div class="fotos-grid-pdf">${imgs.map(f => `<img src="${f.base64}" alt="foto">`).join('')}</div></div>`;
+      return `<div class="fotos-grupo"><h3>${g.label}</h3><div class="fotos-grid-pdf">${imgs.map(f => `<img src="${f.base64 || f}" alt="foto">`).join('')}</div></div>`;
     }).join('');
     if (!content.trim()) return '';
     return `<div class="cert-section"><h2>Registro Fotográfico</h2>${content}</div>`;
   };
 
   const buildFirmasHTML = (firmaTecnico, firmaCliente, tecnico) => {
-    const firmaT = firmaTecnico && !firmaTecnico.endsWith(',') && firmaTecnico.length > 100
+    const esFirmaValida = (f) => typeof f === 'string' && f.length > 100 && !f.endsWith(',');
+
+    const firmaT = esFirmaValida(firmaTecnico)
       ? `<img src="${firmaTecnico}" alt="Firma técnico">`
       : `<div class="firma-linea">Sin firma</div>`;
-    const firmaC = firmaCliente && !firmaCliente.endsWith(',') && firmaCliente.length > 100
+      
+    const firmaC = esFirmaValida(firmaCliente)
       ? `<img src="${firmaCliente}" alt="Firma cliente">`
       : `<div class="firma-linea">Sin firma del cliente</div>`;
+
     return `
       <div class="firmas-grid">
         <div class="firma-box">${firmaT}<div class="firma-nombre">Técnico responsable${tecnico ? `<br>${tecnico}` : ''}</div></div>
@@ -422,15 +434,24 @@ const PDFModule = (() => {
   };
 
   const abrirVentanaPDF = (html, numero) => {
-    const win = window.open('', `cert_${numero}`, 'width=900,height=700,scrollbars=yes');
-    if (win) { win.document.write(html); win.document.close(); }
-    else {
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
+    // Método compatible con navegadores móviles / WebView
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    // Intentar abrir en nueva pestaña (escritorio)
+    const win = window.open(url, '_blank');
+    if (!win) {
+      // Fallback para móviles cuando bloquean emergentes
       const a = document.createElement('a');
-      a.href = url; a.target = '_blank'; a.download = `${numero}.html`; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      a.href = url;
+      a.target = '_blank';
+      a.download = `Certificado_${numero}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
+    
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
   const calcularCostesResumen = (trat) => {
