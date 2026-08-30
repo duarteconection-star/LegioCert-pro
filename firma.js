@@ -1,8 +1,6 @@
 /**
- * LegioCert Pro - Módulo de Firmas Digitales v2
- * Bug fix: inicialización correcta del canvas tras renderizado del DOM
+ * LegioCert Pro - Módulo de Firmas Digitales v2 (Corregido)
  */
-
 const FirmaModule = (() => {
   const instancias = {};
 
@@ -15,7 +13,7 @@ const FirmaModule = (() => {
         <div class="firma-header">
           <span class="firma-label">✍️ ${label}</span>
           <div class="firma-btns">
-            <button class="btn btn-sm btn-ghost" onclick="FirmaModule.limpiar('${containerId}')">Limpiar</button>
+            <button class="btn btn-sm btn-ghost" type="button" onclick="FirmaModule.limpiar('${containerId}')">Limpiar</button>
           </div>
         </div>
         <canvas id="${containerId}_canvas" class="firma-canvas" width="600" height="200"></canvas>
@@ -23,7 +21,6 @@ const FirmaModule = (() => {
       </div>
     `;
 
-    // Esperar al siguiente frame para que el DOM esté pintado
     requestAnimationFrame(() => {
       setTimeout(() => inicializarCanvas(containerId), 100);
     });
@@ -33,7 +30,6 @@ const FirmaModule = (() => {
     const canvas = document.getElementById(`${id}_canvas`);
     if (!canvas) return;
 
-    // Ajustar tamaño real del canvas al tamaño CSS
     const rect = canvas.getBoundingClientRect();
     if (rect.width > 0) {
       canvas.width = rect.width;
@@ -43,11 +39,9 @@ const FirmaModule = (() => {
     const ctx = canvas.getContext('2d');
     let dibujando = false;
 
-    // Fondo blanco
+    // Configuración inicial del lienzo
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Estilo de trazo
     ctx.strokeStyle = '#0A2342';
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
@@ -57,20 +51,17 @@ const FirmaModule = (() => {
       const r = canvas.getBoundingClientRect();
       const scaleX = canvas.width / r.width;
       const scaleY = canvas.height / r.height;
-      if (e.touches && e.touches[0]) {
-        return {
-          x: (e.touches[0].clientX - r.left) * scaleX,
-          y: (e.touches[0].clientY - r.top) * scaleY,
-        };
-      }
+      
+      const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+
       return {
-        x: (e.clientX - r.left) * scaleX,
-        y: (e.clientY - r.top) * scaleY,
+        x: (clientX - r.left) * scaleX,
+        y: (clientY - r.top) * scaleY
       };
     };
 
     const startDraw = (e) => {
-      e.preventDefault();
       dibujando = true;
       const pos = getPos(e);
       ctx.beginPath();
@@ -78,65 +69,39 @@ const FirmaModule = (() => {
     };
 
     const draw = (e) => {
-      e.preventDefault();
       if (!dibujando) return;
       const pos = getPos(e);
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
     };
 
-    const stopDraw = (e) => {
-      if (e) e.preventDefault();
+    const stopDraw = () => {
       dibujando = false;
     };
 
-    // Eliminar listeners anteriores clonando el canvas
-    const newCanvas = canvas.cloneNode(true);
-    canvas.parentNode.replaceChild(newCanvas, canvas);
-    const c = newCanvas;
-    const ctx2 = c.getContext('2d');
-    ctx2.fillStyle = '#FFFFFF';
-    ctx2.fillRect(0, 0, c.width, c.height);
-    ctx2.strokeStyle = '#0A2342';
-    ctx2.lineWidth = 2.5;
-    ctx2.lineCap = 'round';
-    ctx2.lineJoin = 'round';
+    // Eventos Ratón
+    canvas.addEventListener('mousedown', (e) => { startDraw(e); });
+    canvas.addEventListener('mousemove', (e) => { draw(e); });
+    canvas.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('mouseleave', stopDraw);
 
-    let drawing = false;
-
-    const getPos2 = (e) => {
-      const r = c.getBoundingClientRect();
-      const sx = c.width / r.width;
-      const sy = c.height / r.height;
-      if (e.touches && e.touches[0]) {
-        return { x: (e.touches[0].clientX - r.left) * sx, y: (e.touches[0].clientY - r.top) * sy };
-      }
-      return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy };
-    };
-
-    c.addEventListener('mousedown', (e) => {
-      drawing = true;
-      const p = getPos2(e);
-      ctx2.beginPath(); ctx2.moveTo(p.x, p.y);
-    });
-    c.addEventListener('mousemove', (e) => {
-      if (!drawing) return;
-      const p = getPos2(e);
-      ctx2.lineTo(p.x, p.y); ctx2.stroke();
-    });
-    c.addEventListener('mouseup', () => { drawing = false; });
-    c.addEventListener('mouseleave', () => { drawing = false; });
-    c.addEventListener('touchstart', (e) => {
-      e.preventDefault(); drawing = true;
-      const p = getPos2(e); ctx2.beginPath(); ctx2.moveTo(p.x, p.y);
+    // Eventos Táctiles (Móviles)
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.target === canvas) e.preventDefault();
+      startDraw(e);
     }, { passive: false });
-    c.addEventListener('touchmove', (e) => {
-      e.preventDefault(); if (!drawing) return;
-      const p = getPos2(e); ctx2.lineTo(p.x, p.y); ctx2.stroke();
-    }, { passive: false });
-    c.addEventListener('touchend', (e) => { e.preventDefault(); drawing = false; }, { passive: false });
 
-    instancias[id] = { canvas: c, ctx: ctx2 };
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.target === canvas) e.preventDefault();
+      draw(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (e.target === canvas) e.preventDefault();
+      stopDraw();
+    }, { passive: false });
+
+    instancias[id] = { canvas, ctx };
   };
 
   const limpiar = (id) => {
